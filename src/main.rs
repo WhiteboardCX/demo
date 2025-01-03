@@ -2,6 +2,7 @@ use std::{num::NonZeroUsize, sync::Arc, vec};
 
 use anyhow::Context;
 use log::{info, warn};
+use path::PointPath;
 use vello::{
     kurbo::{Affine, Circle, Ellipse, Line, RoundedRect, Stroke},
     peniko::{color::palette, Color},
@@ -15,6 +16,8 @@ use winit::{
     event_loop::{ActiveEventLoop, EventLoop},
     window::{Window, WindowAttributes, WindowId},
 };
+
+mod path;
 
 struct DemoApp<'s> {
     context: RenderContext,
@@ -223,4 +226,14 @@ fn add_shapes_to_scene(scene: &mut Scene) {
     let line = Line::new((260.0, 20.0), (620.0, 100.0));
     let line_stroke_color = Color::new([0.5373, 0.7059, 0.9804, 1.]);
     scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &line);
+
+
+    let mut path = PointPath::new();
+    path.add_point(50., 50., 20.);
+    path.add_point(200., 100., 50.);
+    path.add_point(400., 100.,  25.);
+    path.add_point(400., 200.,  10.);
+
+    let bez = path.bez_path();
+    scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &bez);
 }
