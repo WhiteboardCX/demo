@@ -428,6 +428,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "env_logger",
+ "ink-stroke-modeler-rs",
  "log",
  "pollster",
  "vello",
@@ -743,6 +744,14 @@ checksum = "62f822373a4fe84d4bb149bf54e584a7f4abec90e072ed49cda0edea5b95471f"
 dependencies = [
  "equivalent",
  "hashbrown",
+]
+
+[[package]]
+name = "ink-stroke-modeler-rs"
+version = "0.1.0"
+source = "git+https://github.com/flxzt/ink-stroke-modeler-rs#18c0828689f7c8452a2cff5f862abeafca855ba7"
+dependencies = [
+ "thiserror 1.0.69",
 ]
 
 [[package]]
