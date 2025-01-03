@@ -1,0 +1,6 @@
+max_width = 120
+fn_params_layout = "Compressed"
+imports_granularity = "Crate"
+overflow_delimited_expr = true
+group_imports = "StdExternalCrate"
+unstable_features = true
