@@ -4,15 +4,15 @@ use anyhow::Context;
 use log::{info, warn};
 use path::PointPath;
 use vello::{
-    kurbo::{Affine, BezPath, Circle, Ellipse, Line, RoundedRect, Stroke},
+    kurbo::{Affine, BezPath, Circle, Ellipse, Line, RoundedRect, Stroke, Vec2},
     peniko::{color::palette, Color, Fill},
     util::{RenderContext, RenderSurface},
     wgpu, AaConfig, Renderer, RendererOptions, Scene,
 };
 use winit::{
     application::ApplicationHandler,
-    dpi::LogicalSize,
-    event::WindowEvent,
+    dpi::{LogicalSize, PhysicalPosition},
+    event::{ButtonSource, MouseButton, MouseScrollDelta, PointerSource, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
     window::{Window, WindowAttributes, WindowId},
 };
@@ -23,7 +23,11 @@ struct DemoApp<'s> {
     context: RenderContext,
     state: RenderState<'s>,
     renderers: Vec<Option<Renderer>>,
-    scene: Option<Scene>,
+    scene: Scene,
+    canvas: Scene,
+    transform: Affine,
+    prior_position: Option<Vec2>,
+    mouse_down: bool,
 }
 
 /// Simple struct to hold the state of the renderer
@@ -108,20 +112,55 @@ impl ApplicationHandler for DemoApp<'_> {
             // Exit the event loop when a close is requested (e.g. window's close button is pressed)
             WindowEvent::CloseRequested => event_loop.exit(),
 
-            // Resize the surface when the window is resized
             WindowEvent::SurfaceResized(size) => {
                 self.context
                     .resize_surface(&mut render_state.surface, size.width, size.height);
             }
 
-            // This is where all the rendering happens
-            WindowEvent::RedrawRequested => {
-                if self.scene.is_none() {
-                    let mut scene = Scene::new();
-                    add_shapes_to_scene(&mut scene);
-                    self.scene = Some(scene);
+            WindowEvent::MouseWheel { delta, .. } => {
+                let e = match delta {
+                    MouseScrollDelta::LineDelta(_, y) => y as f64,
+                    MouseScrollDelta::PixelDelta(pd) => pd.y / 20.,
+                };
+                let Some(prior_position) = self.prior_position else {
+                    return;
+                };
+                let scale = 1.05_f64.powf(e);
+                self.transform = Affine::translate(prior_position)
+                    * Affine::scale(scale)
+                    * Affine::translate(-prior_position)
+                    * self.transform;
+                render_state.window.request_redraw();
+            }
+
+            WindowEvent::PointerMoved {
+                position,
+                source: PointerSource::Mouse,
+                ..
+            } => {
+                let position = Vec2::new(position.x, position.y);
+                if self.mouse_down {
+                    if let Some(prior) = self.prior_position {
+                        self.transform = Affine::translate(position - prior) * self.transform;
+                        render_state.window.request_redraw();
+                    }
                 }
-                let scene = self.scene.as_ref().unwrap();
+                self.prior_position = Some(position);
+            }
+
+            WindowEvent::PointerButton {
+                state,
+                button: ButtonSource::Mouse(MouseButton::Left),
+                ..
+            } => {
+                self.mouse_down = state.is_pressed();
+            }
+
+            WindowEvent::RedrawRequested => {
+                self.scene.reset();
+                self.canvas.reset();
+                add_shapes_to_scene(&mut self.canvas);
+                self.scene.append(&self.canvas, Some(self.transform));
 
                 // Get the RenderSurface (surface + config)
                 let surface = &render_state.surface;
@@ -146,10 +185,10 @@ impl ApplicationHandler for DemoApp<'_> {
                     .render_to_surface(
                         &device_handle.device,
                         &device_handle.queue,
-                        scene,
+                        &self.scene,
                         &surface_texture,
                         &vello::RenderParams {
-                            base_color: palette::css::BLACK, // Background color
+                            base_color: palette::css::WHITE,
                             width,
                             height,
                             antialiasing_method: AaConfig::Area,
@@ -186,8 +225,11 @@ fn main() -> anyhow::Result<()> {
         context,
         state: RenderState::Suspended(None),
         renderers: vec![None],
-        scene: None,
-    
+        scene: Scene::new(),
+        canvas: Scene::new(),
+        transform: Affine::IDENTITY,
+        prior_position: None,
+        mouse_down: false,
     };
     event_loop.run_app(app).context("Could not run event loop")?;
 
@@ -233,17 +275,16 @@ fn add_shapes_to_scene(scene: &mut Scene) {
     let mut path = PointPath::new();
     path.add_point(50., 50., 20.);
     path.add_point(200., 100., 50.);
-    path.add_point(400., 100.,  25.);
-    path.add_point(400., 200.,  10.);
+    path.add_point(400., 100., 25.);
+    path.add_point(400., 200., 10.);
 
-    let (bez, aux) = path.bez_path();
+    let bez = path.bez_path();
     // let line_stroke_color = palette::css::GREEN;
     // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &aux);
 
-    let line_stroke_color = palette::css::WHITE;
+    let line_stroke_color = palette::css::BLACK;
     // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &bez);
     scene.fill(Fill::NonZero, Affine::IDENTITY, line_stroke_color, None, &bez);
-
 
     // let arc = vello::kurbo::Arc::new((200., 200.), (100., 100.), 0., FRAC_PI_2, 0.);
     // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &arc);
@@ -256,3 +297,34 @@ fn add_shapes_to_scene(scene: &mut Scene) {
     // let arc = vello::kurbo::Arc::new((200., 200.), (100., 100.), 0., -FRAC_PI_2, 0.);
     // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &arc);
 }
+
+/*
+
+Adapted from the vello examples (https://github.com/linebender/vello/examples), which is licensed as
+
+    Copyright 2020 the Vello Authors
+
+    Permission is hereby granted, free of charge, to any
+    person obtaining a copy of this software and associated
+    documentation files (the "Software"), to deal in the
+    Software without restriction, including without
+    limitation the rights to use, copy, modify, merge,
+    publish, distribute, sublicense, and/or sell copies of
+    the Software, and to permit persons to whom the Software
+    is furnished to do so, subject to the following
+    conditions:
+
+    The above copyright notice and this permission notice
+    shall be included in all copies or substantial portions
+    of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+    ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+    TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+    SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+    CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+    IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+    DEALINGS IN THE SOFTWARE.
+*/

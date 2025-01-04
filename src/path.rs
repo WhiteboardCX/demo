@@ -48,15 +48,14 @@ impl PointPath {
         self.points.push(p);
     }
 
-    pub fn bez_path(&mut self) -> (BezPath, BezPath) {
+    pub fn bez_path(&mut self) -> BezPath {
         let n = self.points.len();
-        let mut aux = BezPath::new();
         if n == 0 {
-            return (BezPath::new(), aux);
+            return BezPath::new();
         } else if n == 1 {
             let p = &self.points[0];
             let c = Circle::new(p.point, p.r);
-            return (c.to_path(0.1), aux);
+            return c.to_path(0.1);
         }
 
         let mut segs_f = Vec::new();
@@ -76,10 +75,6 @@ impl PointPath {
                 p0: q.point + w_b * q.r,
                 p1: p.point + w_b * p.r,
             });
-            aux.move_to(segs_f.last().unwrap().p0);
-            aux.line_to(segs_f.last().unwrap().p1);
-            aux.move_to(segs_b.last().unwrap().p0);
-            aux.line_to(segs_b.last().unwrap().p1);
         }
 
         let mut seg0 = segs_b.first().unwrap();
@@ -93,14 +88,11 @@ impl PointPath {
                 (&segs_b[segs_b.len() - 1 - j], &self.points[n - 1 - j])
             };
             let mut is_intersection = false;
-            println!("\n{seg1:?}");
             if i > 0 {
                 if let Some(intersect) = compute_intersection(seg0, seg1) {
-                    println!("Intersect {intersect:?}");
                     path.line_to(intersect);
                     is_intersection = true;
                 } else {
-                    println!("Line_to   {:?}", seg0.p1);
                     path.line_to(seg0.p1);
                 }
             }
@@ -111,9 +103,7 @@ impl PointPath {
                 if sweep > TAU {
                     sweep -= TAU;
                 }
-                println!("a0={a0}, a1={a1}, p={p:?}");
                 let arc = Arc::new(p.point, (p.r, p.r), a0 - FRAC_PI_2, sweep, 0.);
-                println!("{arc:?}");
                 for b in arc.append_iter(0.1) {
                     path.push(b);
                 }
@@ -121,7 +111,7 @@ impl PointPath {
             seg0 = seg1;
         }
         path.close_path();
-        (path, aux)
+        path
     }
 }
 
