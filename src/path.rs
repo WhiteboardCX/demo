@@ -16,6 +16,7 @@ fn rotate(v: Vec2, angle: f64) -> Vec2 {
     }
 }
 
+#[derive(Default)]
 pub struct PointPath {
     pub points: Vec<PointData>,
 }

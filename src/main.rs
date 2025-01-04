@@ -1,6 +1,7 @@
-use std::{f64::consts::FRAC_PI_2, num::NonZeroUsize, sync::Arc, vec};
+use std::{f64::consts::FRAC_PI_2, num::NonZeroUsize, sync::Arc, time::Instant, vec};
 
 use anyhow::Context;
+use ink_stroke_modeler_rs::{ModelerInput, ModelerInputEventType, ModelerParams, StrokeModeler};
 use log::{info, warn};
 use path::PointPath;
 use vello::{
@@ -12,8 +13,9 @@ use vello::{
 use winit::{
     application::ApplicationHandler,
     dpi::{LogicalSize, PhysicalPosition},
-    event::{ButtonSource, MouseButton, MouseScrollDelta, PointerSource, WindowEvent},
+    event::{ButtonSource, ElementState, MouseButton, MouseScrollDelta, PointerSource, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
+    keyboard::{self, Key, NamedKey},
     window::{Window, WindowAttributes, WindowId},
 };
 
@@ -28,6 +30,68 @@ struct DemoApp<'s> {
     transform: Affine,
     prior_position: Option<Vec2>,
     mouse_down: bool,
+    stroke: Option<StrokeBuilder>,
+}
+
+#[derive(Default)]
+struct StrokeBuilder {
+    scene: Scene,
+    modeler: StrokeModeler,
+    prev_time: Option<Instant>,
+    outputs: Vec<ink_stroke_modeler_rs::ModelerError>,
+    path: PointPath,
+    done: bool,
+}
+
+impl StrokeBuilder {
+    fn new() -> Self {
+        let mut b = Self::default();
+        b.modeler
+            .reset_w_params(ModelerParams {
+                sampling_min_output_rate: 60.,
+                sampling_end_of_stroke_stopping_distance: 0.01,
+                ..ModelerParams::suggested()
+            })
+            .unwrap();
+        b
+    }
+
+    fn reset(&mut self) {
+        self.scene.reset();
+        self.modeler.reset();
+        self.prev_time = None;
+        self.done = false;
+    }
+
+    fn add_point(&mut self, x: f64, y: f64, pressure: f64, done: bool) {
+        let now = Instant::now();
+        let (time, event_type) = if let Some(prev_time) = self.prev_time {
+            (
+                now.duration_since(prev_time).as_secs_f64(),
+                if done {
+                    self.done = true;
+                    ModelerInputEventType::Up
+                } else {
+                    ModelerInputEventType::Move
+                },
+            )
+        } else {
+            (0., ModelerInputEventType::Down)
+        };
+        match self.modeler.update(ModelerInput {
+            event_type,
+            time,
+            pressure,
+            pos: (x, y),
+        }) {
+            Ok(results) => for res in results {
+                self.path.add_point(res.pos.0, res.pos.1, res.pressure * 2.);
+            },
+            Err(_) => {}
+        }
+    }
+
+    fn draw(&mut self) {}
 }
 
 /// Simple struct to hold the state of the renderer
@@ -156,6 +220,19 @@ impl ApplicationHandler for DemoApp<'_> {
                 self.mouse_down = state.is_pressed();
             }
 
+            WindowEvent::KeyboardInput { event, .. } => {
+                if !event.state.is_pressed() {
+                    return;
+                }
+                match event.logical_key {
+                    Key::Named(NamedKey::Space) => {
+                        self.transform = Affine::IDENTITY;
+                        render_state.window.request_redraw();
+                    }
+                    _ => {}
+                }
+            }
+
             WindowEvent::RedrawRequested => {
                 self.scene.reset();
                 self.canvas.reset();
@@ -227,6 +304,7 @@ fn main() -> anyhow::Result<()> {
         renderers: vec![None],
         scene: Scene::new(),
         canvas: Scene::new(),
+        stroke: None,
         transform: Affine::IDENTITY,
         prior_position: None,
         mouse_down: false,
