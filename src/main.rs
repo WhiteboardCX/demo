@@ -1,11 +1,11 @@
-use std::{num::NonZeroUsize, sync::Arc, vec};
+use std::{f64::consts::FRAC_PI_2, num::NonZeroUsize, sync::Arc, vec};
 
 use anyhow::Context;
 use log::{info, warn};
 use path::PointPath;
 use vello::{
-    kurbo::{Affine, Circle, Ellipse, Line, RoundedRect, Stroke},
-    peniko::{color::palette, Color},
+    kurbo::{Affine, BezPath, Circle, Ellipse, Line, RoundedRect, Stroke},
+    peniko::{color::palette, Color, Fill},
     util::{RenderContext, RenderSurface},
     wgpu, AaConfig, Renderer, RendererOptions, Scene,
 };
@@ -23,7 +23,7 @@ struct DemoApp<'s> {
     context: RenderContext,
     state: RenderState<'s>,
     renderers: Vec<Option<Renderer>>,
-    scene: Scene,
+    scene: Option<Scene>,
 }
 
 /// Simple struct to hold the state of the renderer
@@ -116,12 +116,12 @@ impl ApplicationHandler for DemoApp<'_> {
 
             // This is where all the rendering happens
             WindowEvent::RedrawRequested => {
-                // Empty the scene of objects to draw. You could create a new Scene each time, but in this case
-                // the same Scene is reused so that the underlying memory allocation can also be reused.
-                self.scene.reset();
-
-                // Re-add the objects to draw to the scene.
-                add_shapes_to_scene(&mut self.scene);
+                if self.scene.is_none() {
+                    let mut scene = Scene::new();
+                    add_shapes_to_scene(&mut scene);
+                    self.scene = Some(scene);
+                }
+                let scene = self.scene.as_ref().unwrap();
 
                 // Get the RenderSurface (surface + config)
                 let surface = &render_state.surface;
@@ -146,7 +146,7 @@ impl ApplicationHandler for DemoApp<'_> {
                     .render_to_surface(
                         &device_handle.device,
                         &device_handle.queue,
-                        &self.scene,
+                        scene,
                         &surface_texture,
                         &vello::RenderParams {
                             base_color: palette::css::BLACK, // Background color
@@ -186,7 +186,8 @@ fn main() -> anyhow::Result<()> {
         context,
         state: RenderState::Suspended(None),
         renderers: vec![None],
-        scene: Scene::new(),
+        scene: None,
+    
     };
     event_loop.run_app(app).context("Could not run event loop")?;
 
@@ -195,38 +196,39 @@ fn main() -> anyhow::Result<()> {
 
 fn add_shapes_to_scene(scene: &mut Scene) {
     // Draw an outlined rectangle
-    let stroke = Stroke::new(6.0);
-    let rect = RoundedRect::new(10.0, 10.0, 240.0, 240.0, 20.0);
-    let rect_stroke_color = Color::new([0.9804, 0.702, 0.5294, 1.]);
-    scene.stroke(&stroke, Affine::IDENTITY, rect_stroke_color, None, &rect);
+    // let stroke = Stroke::new(6.0);
+    // let rect = RoundedRect::new(10.0, 10.0, 240.0, 240.0, 20.0);
+    // let rect_stroke_color: vello::peniko::color::AlphaColor<vello::peniko::color::Srgb> = Color::new([0.9804, 0.702, 0.5294, 1.]);
+    // scene.stroke(&stroke, Affine::IDENTITY, rect_stroke_color, None, &rect);
 
-    // Draw a filled circle
-    let circle = Circle::new((420.0, 200.0), 120.0);
-    let circle_fill_color = Color::new([0.9529, 0.5451, 0.6588, 1.]);
-    scene.fill(
-        vello::peniko::Fill::NonZero,
-        Affine::IDENTITY,
-        circle_fill_color,
-        None,
-        &circle,
-    );
+    // // Draw a filled circle
+    // let circle = Circle::new((420.0, 200.0), 120.0);
+    // let circle_fill_color = Color::new([0.9529, 0.5451, 0.6588, 1.]);
+    // scene.fill(
+    //     vello::peniko::Fill::NonZero,
+    //     Affine::IDENTITY,
+    //     circle_fill_color,
+    //     None,
+    //     &circle,
+    // );
 
-    // Draw a filled ellipse
-    let ellipse = Ellipse::new((250.0, 420.0), (100.0, 160.0), -90.0);
-    let ellipse_fill_color = Color::new([0.7961, 0.651, 0.9686, 1.]);
-    scene.fill(
-        vello::peniko::Fill::NonZero,
-        Affine::IDENTITY,
-        ellipse_fill_color,
-        None,
-        &ellipse,
-    );
+    // // Draw a filled ellipse
+    // let ellipse = Ellipse::new((250.0, 420.0), (100.0, 160.0), -90.0);
+    // let ellipse_fill_color = Color::new([0.7961, 0.651, 0.9686, 1.]);
+    // scene.fill(
+    //     vello::peniko::Fill::NonZero,
+    //     Affine::IDENTITY,
+    //     ellipse_fill_color,
+    //     None,
+    //     &ellipse,
+    // );
 
-    // Draw a straight line
-    let line = Line::new((260.0, 20.0), (620.0, 100.0));
-    let line_stroke_color = Color::new([0.5373, 0.7059, 0.9804, 1.]);
-    scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &line);
+    // // Draw a straight line
+    // let line = Line::new((260.0, 20.0), (620.0, 100.0));
+    // let line_stroke_color = Color::new([0.5373, 0.7059, 0.9804, 1.]);
+    // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &line);
 
+    let stroke = Stroke::new(1.);
 
     let mut path = PointPath::new();
     path.add_point(50., 50., 20.);
@@ -234,6 +236,23 @@ fn add_shapes_to_scene(scene: &mut Scene) {
     path.add_point(400., 100.,  25.);
     path.add_point(400., 200.,  10.);
 
-    let bez = path.bez_path();
-    scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &bez);
+    let (bez, aux) = path.bez_path();
+    // let line_stroke_color = palette::css::GREEN;
+    // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &aux);
+
+    let line_stroke_color = palette::css::WHITE;
+    // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &bez);
+    scene.fill(Fill::NonZero, Affine::IDENTITY, line_stroke_color, None, &bez);
+
+
+    // let arc = vello::kurbo::Arc::new((200., 200.), (100., 100.), 0., FRAC_PI_2, 0.);
+    // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &arc);
+    // let line_stroke_color = palette::css::RED;
+    // for p in path.points.iter() {
+    //     let c = Circle::new(p.point, p.r);
+    //     scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &c);
+    // }
+
+    // let arc = vello::kurbo::Arc::new((200., 200.), (100., 100.), 0., -FRAC_PI_2, 0.);
+    // scene.stroke(&stroke, Affine::IDENTITY, line_stroke_color, None, &arc);
 }

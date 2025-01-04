@@ -1,5 +1,5 @@
 use std::{
-    f64::consts::{FRAC_PI_2, PI},
+    f64::consts::{FRAC_PI_2, PI, TAU},
     vec,
 };
 
@@ -17,7 +17,7 @@ fn rotate(v: Vec2, angle: f64) -> Vec2 {
 }
 
 pub struct PointPath {
-    points: Vec<PointData>,
+    pub points: Vec<PointData>,
 }
 
 impl PointPath {
@@ -48,14 +48,15 @@ impl PointPath {
         self.points.push(p);
     }
 
-    pub fn bez_path(&mut self) -> BezPath {
+    pub fn bez_path(&mut self) -> (BezPath, BezPath) {
         let n = self.points.len();
+        let mut aux = BezPath::new();
         if n == 0 {
-            return BezPath::new();
+            return (BezPath::new(), aux);
         } else if n == 1 {
             let p = &self.points[0];
             let c = Circle::new(p.point, p.r);
-            return c.to_path(0.1);
+            return (c.to_path(0.1), aux);
         }
 
         let mut segs_f = Vec::new();
@@ -75,10 +76,13 @@ impl PointPath {
                 p0: q.point + w_b * q.r,
                 p1: p.point + w_b * p.r,
             });
+            aux.move_to(segs_f.last().unwrap().p0);
+            aux.line_to(segs_f.last().unwrap().p1);
+            aux.move_to(segs_b.last().unwrap().p0);
+            aux.line_to(segs_b.last().unwrap().p1);
         }
 
         let mut seg0 = segs_b.first().unwrap();
-        seg0 = segs_f.first().unwrap();
         let mut path = BezPath::new();
         path.move_to(seg0.p1);
         for i in 0..2 * segs_f.len() {
@@ -89,33 +93,42 @@ impl PointPath {
                 (&segs_b[segs_b.len() - 1 - j], &self.points[n - 1 - j])
             };
             let mut is_intersection = false;
+            println!("\n{seg1:?}");
             if i > 0 {
                 if let Some(intersect) = compute_intersection(seg0, seg1) {
+                    println!("Intersect {intersect:?}");
                     path.line_to(intersect);
-                    path.push(PathEl::LineTo(intersect));
                     is_intersection = true;
                 } else {
+                    println!("Line_to   {:?}", seg0.p1);
                     path.line_to(seg0.p1);
                 }
             }
             if !is_intersection {
                 let a0 = line_angle(seg0);
                 let a1 = line_angle(seg1) + PI;
-                let arc = Arc::new(p.point, Vec2::new(p.r, p.r), a0 - FRAC_PI_2, PI - (a0 - a1), 0.);
+                let mut sweep = PI - (a0 - a1);
+                if sweep > TAU {
+                    sweep -= TAU;
+                }
+                println!("a0={a0}, a1={a1}, p={p:?}");
+                let arc = Arc::new(p.point, (p.r, p.r), a0 - FRAC_PI_2, sweep, 0.);
+                println!("{arc:?}");
                 for b in arc.append_iter(0.1) {
                     path.push(b);
                 }
-                seg0 = seg1;
             }
+            seg0 = seg1;
         }
         path.close_path();
-        path
+        (path, aux)
     }
 }
 
-struct PointData {
-    point: Point,
-    r: f64,
+#[derive(Debug)]
+pub struct PointData {
+    pub point: Point,
+    pub r: f64,
 }
 
 impl PointData {
