@@ -4,7 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-winit = { path = "../winit" }
+# winit = { path = "../winit" }
+winit = { git = "https://github.com/WhiteboardCX/winit.git", branch = "tablet"}
 vello = { git = "https://github.com/linebender/vello" }
 ink-stroke-modeler-rs = { git = "https://github.com/flxzt/ink-stroke-modeler-rs" }
 env_logger = "0.11.6"

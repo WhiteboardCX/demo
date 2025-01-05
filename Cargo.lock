@@ -468,6 +468,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "dpi"
 version = "0.1.1"
+source = "git+https://github.com/WhiteboardCX/winit.git?branch=tablet#f480b66351608d8b3beb6be7fdca82c34380b7bd"
 
 [[package]]
 name = "env_filter"
@@ -2465,6 +2466,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "winit"
 version = "0.30.7"
+source = "git+https://github.com/WhiteboardCX/winit.git?branch=tablet#f480b66351608d8b3beb6be7fdca82c34380b7bd"
 dependencies = [
  "ahash",
  "android-activity",
