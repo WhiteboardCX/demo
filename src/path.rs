@@ -1,9 +1,6 @@
-use std::{
-    f64::consts::{FRAC_PI_2, PI, TAU},
-    vec,
-};
+use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
-use vello::kurbo::{Arc, BezPath, Circle, Line, PathEl, PathSeg, Point, Rect, Shape, Vec2};
+use vello::kurbo::{Arc, BezPath, Circle, Line, Point, Shape, Vec2};
 
 const EPS: f64 = 1e-3;
 
@@ -119,11 +116,6 @@ pub struct PointData {
 }
 
 impl PointData {
-    fn bounds(&self) -> Rect {
-        // Function implementation goes here
-        unimplemented!()
-    }
-
     fn contains(&self, other: &PointData) -> bool {
         let d = self.point.distance(other.point);
         d + other.r <= self.r + EPS

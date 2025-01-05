@@ -1,21 +1,21 @@
-use std::{f32::MIN, f64::consts::FRAC_PI_2, num::NonZeroUsize, sync::Arc, time::Instant, vec};
+use std::{num::NonZeroUsize, sync::Arc, time::Instant, vec};
 
 use anyhow::Context;
 use ink_stroke_modeler_rs::{ModelerError, ModelerInput, ModelerInputEventType, ModelerParams, StrokeModeler};
-use log::{debug, error, info, warn};
+use log::{info, warn};
 use path::PointPath;
 use vello::{
-    kurbo::{Affine, BezPath, Circle, Ellipse, Line, Point, RoundedRect, Stroke, Vec2},
-    peniko::{color::palette, Color, Fill},
+    kurbo::{Affine, Point, Vec2},
+    peniko::{color::palette, Fill},
     util::{RenderContext, RenderSurface},
     wgpu, AaConfig, Renderer, RendererOptions, Scene,
 };
 use winit::{
     application::ApplicationHandler,
-    dpi::{LogicalSize, PhysicalPosition},
-    event::{ButtonSource, ElementState, MouseButton, MouseScrollDelta, PointerSource, ToolButton, WindowEvent},
+    dpi::LogicalSize,
+    event::{ButtonSource, MouseButton, MouseScrollDelta, PointerSource, WindowEvent},
     event_loop::{ActiveEventLoop, EventLoop},
-    keyboard::{self, Key, NamedKey},
+    keyboard::{Key, NamedKey},
     window::{Window, WindowAttributes, WindowId},
 };
 
@@ -293,6 +293,10 @@ impl ApplicationHandler for DemoApp<'_> {
                 match event.logical_key {
                     Key::Named(NamedKey::Space) => {
                         self.transform = Affine::IDENTITY;
+                        render_state.window.request_redraw();
+                    }
+                    Key::Character(c) if c.to_ascii_lowercase() == "c" => {
+                        self.canvas.reset();
                         render_state.window.request_redraw();
                     }
                     _ => {}
