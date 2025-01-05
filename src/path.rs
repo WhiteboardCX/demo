@@ -31,24 +31,16 @@ impl PointPath {
             point: Point { x, y },
             r,
         };
-        if !self.points.is_empty() {
-            if self.points.last().unwrap().contains(&p) {
-                let mut replace = false;
-                while !self.points.is_empty()
-                    && self.points.last().unwrap().r < r
-                    && self.points.last().unwrap().contains(&p)
-                {
-                    replace = true;
-                    self.points.pop();
-                }
-                if !replace {
-                    return;
-                }
-            }
+        while !self.points.is_empty() && p.contains(self.points.last().unwrap()) {
+            self.points.pop();
+        }
+        if !self.points.is_empty() && self.points.last().unwrap().contains(&p) {
+            return;
         }
         self.points.push(p);
     }
 
+    // TODO does not look 100% right yet...
     pub fn bez_path(&mut self) -> BezPath {
         let n = self.points.len();
         if n == 0 {
@@ -101,10 +93,11 @@ impl PointPath {
                 let a0 = line_angle(seg0);
                 let a1 = line_angle(seg1) + PI;
                 let mut sweep = PI - (a0 - a1);
-                if sweep > TAU {
+                if sweep >= PI {
                     sweep -= TAU;
                 }
                 let arc = Arc::new(p.point, (p.r, p.r), a0 - FRAC_PI_2, sweep, 0.);
+                println!("{arc:?}");
                 for b in arc.append_iter(0.1) {
                     path.push(b);
                 }
@@ -113,6 +106,10 @@ impl PointPath {
         }
         path.close_path();
         path
+    }
+
+    pub fn reset(&mut self) {
+        self.points.clear();
     }
 }
 
