@@ -97,7 +97,6 @@ impl PointPath {
                     sweep -= TAU;
                 }
                 let arc = Arc::new(p.point, (p.r, p.r), a0 - FRAC_PI_2, sweep, 0.);
-                println!("{arc:?}");
                 for b in arc.append_iter(0.1) {
                     path.push(b);
                 }
